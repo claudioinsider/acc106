@@ -47,8 +47,6 @@
     <link rel="preconnect" href="https://images.converteai.net" crossorigin />
     <link rel="preconnect" href="https://api.vturb.com.br" crossorigin />
     <link rel="preconnect" href="https://imagedelivery.net" crossorigin />
-    <link rel="dns-prefetch" href="https://kujvy.ttrk.io" />
-    <link rel="dns-prefetch" href="https://trk.healthtp.site" />
 
     <!-- Preload do player + manifesto HLS (LCP do vídeo) -->
     <link
@@ -555,11 +553,10 @@
         /* ============================================================
          * Constantes
          * ============================================================ */
-        var POSTBACK_URL = "https://kujvy.ttrk.io/postback"
-        var POSTBACK_TYPE = "VSLView"
-        var CLICKID_PARAM = "rtkcid"
+
         var LEAD = "L1"
         var PITCH_MMSS = 4633
+        var PITCH_MMSS = 4
 
         /* Detecção de ambiente — útil pra debug e ajustes específicos */
         var UA = navigator.userAgent || ""
@@ -574,55 +571,6 @@
         if (IS_IOS) document.documentElement.classList.add("ios")
         if (IS_ANDROID) document.documentElement.classList.add("android")
         if (IS_INAPP) document.documentElement.classList.add("inapp")
-
-        /* ============================================================
-         * 1. Postback (clickid → VSLView)
-         *    Usa sendBeacon quando disponível: zero impacto na UI thread.
-         * ============================================================ */
-        function postback() {
-          var params, clickid
-          try {
-            params = new URLSearchParams(location.search)
-            clickid = params.get(CLICKID_PARAM)
-          } catch (e) {
-            return
-          }
-          if (!clickid) return
-          var key = "pb:" + POSTBACK_TYPE + ":" + clickid
-          try {
-            if (sessionStorage.getItem(key)) return
-            sessionStorage.setItem(key, "1")
-          } catch (e) {}
-          var url =
-            POSTBACK_URL +
-            "?clickid=" +
-            encodeURIComponent(clickid) +
-            "&type=" +
-            encodeURIComponent(POSTBACK_TYPE)
-          // 1. sendBeacon — ideal: não bloqueia, sobrevive ao unload
-          if (navigator.sendBeacon) {
-            try {
-              if (navigator.sendBeacon(url)) return
-            } catch (e) {}
-          }
-          // 2. fetch keepalive — moderno
-          try {
-            fetch(url, {
-              method: "GET",
-              keepalive: true,
-              mode: "no-cors",
-              credentials: "omit",
-            }).catch(function () {
-              // 3. Image pixel — fallback universal (Safari iOS antigo, navegadores in-app de Insta/TikTok/FB)
-              new Image().src = url
-            })
-            return
-          } catch (e) {}
-          // 4. Último recurso
-          try {
-            new Image().src = url
-          } catch (e) {}
-        }
 
         /* ============================================================
          * 2. Player vturb — múltiplos eventos + fallback de 3s
@@ -684,151 +632,6 @@
         }
 
         /* ============================================================
-         * 3. Comentários — renderiza do JSON via <template>
-         * ============================================================ */
-        var COMMENTS = [
-          {
-            name: "James Mitchell",
-            avatar: "h-1",
-            likes: 23,
-            time: "2h",
-            resp: false,
-            text: "I started using this combination of ingredients 15 days ago, and the results are amazing. My blood pressure, which used to be always high, has started to stabilize. I'm determined to keep going strong because it's really worth it!",
-          },
-          {
-            name: "Patricia Simmons",
-            avatar: "m-3",
-            likes: 17,
-            time: "35min",
-            resp: true,
-            text: "FINALLY, someone who gets straight to the point! Thank you!! I just started today, and I'm so excited! ❤ I couldn't stand living in fear of having a heart attack or stroke… now I feel hopeful with this mixture.",
-          },
-          {
-            name: "Robert Walters",
-            avatar: "h-3",
-            likes: 11,
-            time: "7min",
-            resp: true,
-            text: "The way you explain things is so clear and straightforward… it's exactly what I needed. I'm going to prepare this combination today! If it really helps control my blood pressure, it's going to change my life.",
-          },
-          {
-            name: "Thomas Bennett",
-            avatar: "h-2",
-            likes: 33,
-            time: "1h",
-            resp: false,
-            text: "The clarity of this video is impressive. No fluff, no nonsense. You have the courage to tell the truth and show the way. Congratulations 😄 I had already tried everything to control my blood pressure without filling my body with medication, but this combination feels different. Now I finally see a light at the end of the tunnel.",
-          },
-          {
-            name: "Sandra Collins",
-            avatar: "m-1",
-            likes: 54,
-            time: "1h",
-            resp: false,
-            text: "I've been taking this mixture for 17 days now, and besides seeing my blood pressure go down, the changes in my body have been incredible. That constant fatigue, headaches, and fear are gone. Everything has changed for me! I absolutely love it!",
-          },
-          {
-            name: "Dorothy Harrison",
-            avatar: "m-2",
-            likes: 10,
-            time: "19min",
-            resp: false,
-            text: "You were a light in my life. A few years ago, I went through the worst phase I had ever experienced… living with high blood pressure, dizziness, chest pain, and constant fear. But then I decided to take care of myself and look for something that truly worked. I found your video, and it was a real blessing. I've been making this mixture for only 5 days, and I already feel completely renewed—lighter, more energized, and my blood pressure is finally coming down. I never imagined I could feel this good so quickly.",
-          },
-        ]
-
-        function renderComments() {
-          var root = document.getElementById("comments")
-          var tpl = document.getElementById("tpl-comment")
-          if (!root || !tpl) return
-          var frag = document.createDocumentFragment()
-          for (var i = 0; i < COMMENTS.length; i++) {
-            var c = COMMENTS[i]
-            var node = tpl.content.firstElementChild.cloneNode(true)
-            if (c.resp) node.classList.add("resp")
-            node.querySelector(".comment-avatar").src = c.avatar + ".jpg"
-            node.querySelector(".comment-author").textContent = c.name
-            node.querySelector(".comment-text").textContent = c.text
-            node.querySelector(".like-num").textContent = c.likes
-            node.querySelector(".time").textContent = c.time
-            frag.appendChild(node)
-          }
-          root.appendChild(frag)
-        }
-
-        /* ============================================================
-         * 4. Interações nos comentários (delegação de evento)
-         * ============================================================ */
-        function setupComments() {
-          var root = document.getElementById("comments")
-          if (!root) return
-          var activeTooltip = null,
-            tooltipTimer = null
-
-          function removeTooltip() {
-            if (activeTooltip && activeTooltip.parentNode)
-              activeTooltip.parentNode.removeChild(activeTooltip)
-            activeTooltip = null
-            if (tooltipTimer) {
-              clearTimeout(tooltipTimer)
-              tooltipTimer = null
-            }
-          }
-
-          document.addEventListener(
-            "click",
-            function (e) {
-              if (activeTooltip && !e.target.classList.contains("action"))
-                removeTooltip()
-            },
-            { passive: true },
-          )
-
-          root.addEventListener(
-            "click",
-            function (e) {
-              var t = e.target
-              if (!t.classList.contains("action")) return
-              var txt = t.textContent.trim()
-              if (txt === "Like" || txt === "Dislike") {
-                var sc = t.closest(".sub-comments")
-                if (!sc) return
-                var n = sc.querySelector(".like-num")
-                if (!n) return
-                var cur = parseInt(n.textContent, 10) || 0
-                if (txt === "Like") {
-                  n.textContent = cur + 1
-                  t.textContent = "Dislike"
-                } else {
-                  n.textContent = Math.max(0, cur - 1)
-                  t.textContent = "Like"
-                }
-                return
-              }
-              if (txt === "Reply") {
-                removeTooltip()
-                var tip = document.createElement("div")
-                tip.textContent = "it is no longer possible"
-                tip.className = "reply-tooltip"
-                document.body.appendChild(tip)
-                var r = t.getBoundingClientRect()
-                var tipW = tip.offsetWidth
-                // Clamp horizontal pra não sair da viewport em mobile
-                var left = Math.max(8, Math.min(r.left, innerWidth - tipW - 8))
-                var top = scrollY + r.top - 35
-                // Se for sair pelo topo, joga pra baixo do botão
-                if (top < scrollY + 8) top = scrollY + r.bottom + 8
-                tip.style.top = top + "px"
-                tip.style.left = left + "px"
-                activeTooltip = tip
-                tooltipTimer = setTimeout(removeTooltip, 3000)
-              }
-            },
-            { passive: true },
-          )
-        }
-
-        /* ============================================================
          * 5. Lead tracking — sub16 nos links de oferta apenas
          * ============================================================ */
         function setupLeads() {
@@ -862,10 +665,7 @@
         }
 
         function init() {
-          postback()
-          renderComments()
           setupPlayer()
-          idle(setupComments)
           idle(setupLeads)
         }
 
